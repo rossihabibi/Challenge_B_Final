@@ -1,0 +1,303 @@
+---
+title: "Challenge B"
+author: "Amund Hanson Kord / Mauricio Hitschfeld Arriagada"
+output: pdf_document
+classoption: a4paper
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+To start, we install all the packages needed for the whole challenge (see R script).
+```{r packages, include=FALSE}
+packages <- c("dplyr", "mice", "data.table", "randomForest", "DMwR", "plyr", "Hmisc", "tidyverse", "caret", "gdata", "ggplot2", "np", "ff")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))  
+}
+library(tidyverse)
+library(caret)
+library(data.table)
+library(randomForest)
+library(gdata)
+library(ggplot2)
+library(Hmisc)
+library(plyr)
+library(dplyr)
+library(mice)
+library(DMwR)
+library(np)
+library(ff)
+```
+
+# Task 1B - Predicting house prices in Ames, Iowa (continued)
+First, we load the dataset and call it train and test.
+```{r 1, echo=FALSE, results="hide"}
+train1 <- read.csv("~/rprog/train.csv")
+test  <- read.csv("~/rprog/test.csv")
+```
+We analyse the data and get that there are some missing variables.
+```{r 2, echo=FALSE, fig.height = 3, fig.width = 5, results="hide"}
+na_count <- sapply(train1, function(y) sum(length(which(is.na(y)))))
+na_count
+```
+We remove the columns where there are a lot of missing variables, and we remove the rows where there are fewer misiing variables.
+```{r 3, echo=FALSE, results="hide"}
+train1$PoolQC <- NULL
+train1$Fence <- NULL
+train1$MiscFeature <- NULL
+train1$Alley <- NULL
+train1$FireplaceQu <- NULL
+train1$LotFrontage <- NULL
+train<- na.omit(train1)
+```
+
+**\underline{Step 1:}** We choose to use the random forest technique. Random forest technique are an ensemble machine learning method.
+As opposed to single learning algorythms, ensamble methods obtain multiple learning algorithms, or in this case, "decision trees"" wich in many cases gives the model better predictive capabilities. Decision tree models uses a a sequence of algotythms to go from the observations to the given predictions. However, "deep" trees (trees with a lot of decision points) have a tendency to overfit their training sets. This results in a high variance even though the bias of the model is low. Random forest operate by constructing multiple deep decision trees from differen parts of the training set and then taking the average of these decision trees. Thus reducing the variance of the model, but at the expence of some bias. At each algorythm one can also adjust the number of variables randomly sampled as candidates at each split, or that the model asseses at each split what is the best variable to use. In smaller trees one could experience that the model does not use all the variables in the data. 
+
+**\underline{Step 2:}** We start off by setting using our model from Challenge A, with 10 trees and 9 random variables that is sampled at each split.
+```{r task1_step2, echo=FALSE, results="hide"}
+fit.house <- randomForest(SalePrice ~ MSSubClass + LotArea + Street + Neighborhood + 
+                            OverallCond + YearBuilt + RoofStyle + RoofMatl + ExterQual + 
+                            BsmtQual + X1stFlrSF + KitchenQual + TotRmsAbvGrd+Functional + 
+                            Fireplaces + GarageCars + WoodDeckSF + ScreenPorch ,
+                          data = train, mtry=9 ,ntree=10, set.seed(1))
+fit.house
+```
+We can see that around 74% of the variance in housing prices is explained. We then do the regression again, but this time we set the number of trees to 100, this time we do not specify the number of random variables assesed at each split. This leads the model to choose randomly among all the variables in the sample at each split.
+
+```{r 4, echo=FALSE, results="hide"}
+fit.house2 <- randomForest(SalePrice ~ MSSubClass + LotArea + Street + Neighborhood + 
+                             OverallCond + YearBuilt + RoofStyle + RoofMatl + ExterQual +
+                             BsmtQual + X1stFlrSF + KitchenQual + TotRmsAbvGrd+Functional +
+                             Fireplaces + GarageCars + WoodDeckSF + ScreenPorch ,
+                           data = train, ntree=100, set.seed(1))
+fit.house2
+```
+Now we see that the variance jumped up to around 84%. We can also plot the residuals of the model at diffrent number of trees.
+
+```{r 5, fig.height = 3, fig.width = 5, echo=FALSE, results='hide', fig.show='hide'}
+plot(fit.house2)
+```
+We see that roughly, the more decision trees we use in the model, the smaller the residuals become. That being said, even though the random forest model takes the average of several decision trees.
+
+**\underline{Step 3:}** We have chosen to use the OLS estimator to compare with the random forest estimator. We therefore first regress the OLS model, to make it more easily comparable we use tha same variables as we used in the random forest regression.
+```{r task1_step3, echo=FALSE, results="hide"}
+fit.ols.house2 <- lm(SalePrice ~ MSSubClass + LotArea + Street+Neighborhood+ 
+                       OverallCond + YearBuilt + RoofStyle + RoofMatl + ExterQual +
+                       BsmtQual + X1stFlrSF + KitchenQual + TotRmsAbvGrd+Functional +
+                       Fireplaces + GarageCars + WoodDeckSF + ScreenPorch ,
+                     set.seed(1), data = train)
+```
+We then compare the of the two models by finding their respective predictive values on the data set test.
+```{r 6, echo=FALSE, results="hide"}
+predict.rf<-predict(fit.house2 ,data=test)
+predict.ols<-predict(fit.ols.house2 ,data=test)
+```
+We then calculate the difference between the predictions at each point and show the results in a summary.
+```{r 7, echo=FALSE, results="hide"}
+diffrence<-as.data.frame(predict.rf-predict.ols)
+summary(diffrence)
+```
+The variance between the two models are considerable at their max and min level. Even though we see that the first and third quantile only has an approximate error of 10.000 in respectively positive and negative direction. The mean deviation is also considerably low given the facet that we are estimating values that vary a lot.
+We then plot the diffrence between the two estimators on a table.
+```{r 8, fig.height = 3, fig.width = 5, echo=FALSE, results="hide", fig.show='hide'}
+plot(diffrence)
+```
+
+
+#Task 2B - Overfitting in Machine Learning (continued)
+For this Challenge, we use the same variables and datasets created in Challenge A (see R Script).
+
+```{r challengeA_part_Task2, include=FALSE}
+set.seed(1)
+x <- rnorm(n = 150, mean = 0, sd = 1)
+epsilon <- rnorm(n = 150, mean = 0, sd = 1)
+y <- x^3 + epsilon
+
+variable_y <- data.frame(y)
+variable_x <- data.frame(x)
+
+dataset <- cbindX(variable_y, variable_x)
+
+set.seed(2)
+training_index <- createDataPartition(dataset$x, times = 1, p = 0.8, list = FALSE)
+
+test <- slice(dataset, -training_index)
+training <- slice(dataset, training_index)
+
+y_true <- training$x^3
+```
+
+**\underline{Step1 -Step 2:}** We estimate a low-flexibility and a high-flexibility local linear model on the training data using the function $npreg$.
+```{r task2_step1, echo=FALSE, results='hide'}
+ll.fit.lowflex <- npreg(y ~ x, data = training, method = "ll", bws = 0.5)
+summary(ll.fit.lowflex)
+```
+
+```{r task2_step2, echo=FALSE, results='hide'}
+ll.fit.highflex <- npreg(y ~ x, data = training, method = "ll", bws = 0.01)
+summary(ll.fit.highflex)
+```
+
+**\underline{Step 3:}** We compute the predictions for $ll.fit.highflex$ and $ll.fit.lowflex$ ($\hat{y}^T$ was computed in Challenge A). Then, using $ggplot$ we plot the scatterplot, along with the predictions.
+```{r task2_step3, echo=FALSE, results='hide', fig.show='hide'}
+#First, we compute the predictions for ll.fit.highflex and ll.fit.lowflex
+fitted.highflex <- fitted(ll.fit.highflex)
+fitted.lowflex <- fitted(ll.fit.lowflex)
+
+#And now, we are able to plot.
+graph1 <- ggplot() +
+  geom_point(data=training, mapping = aes(x = x, y = y)) + 
+  geom_line(data=training, mapping = aes(x = x, y = y_true)) +
+  geom_line(data=training, mapping = aes(x = x, y = fitted.highflex), color = "blue") +
+  geom_line(data=training, mapping = aes(x = x, y = fitted.lowflex), color = "red")
+
+graph1
+```
+
+**\underline{Step 4:}** Looking at the graph (R script) we check that the model $ll.fit.highflex$ is the prediction most variable, which has the lowest bandwidth. Also, we can compute the variance of each prediction and check this statement.
+```{r task2_step4_Var, , echo=FALSE, results='hide'}
+variance <- cbind(var(y_true), var(fitted.highflex), var(fitted.lowflex))
+colnames(variance) <- c("true model","highflex","lowflex")
+
+variance
+```
+In addition, we can check which prediction has the least bias computing the difference between $y$ and the $fitted$ $value$ of each model and computing the absolute value of the mean.
+```{r task2_step4_Bias, echo=FALSE, results='hide'}
+bias <- cbind(mean(y_true-training$y), mean(fitted.highflex-training$y), mean(fitted.lowflex-training$y))
+colnames(bias) <- c("true model","highflex","lowflex")
+
+abs(bias)
+```
+Then, the model $ll.fit.highflex$ has the least bias.
+
+**\underline{Step 5:}** We reply the Steps 1, 2, 3 and 4 using the test data.
+```{r task2_step5, echo=FALSE, results='hide', fig.show='hide'}
+ll.fit.lowflex.test <- npreg(y ~ x, data = test, method = "ll", bws = 0.5)
+summary(ll.fit.lowflex.test)
+ll.fit.highflex.test <- npreg(y ~ x, data = test, method = "ll", bws = 0.01)
+summary(ll.fit.highflex.test)
+y_true.test <- test$x^3
+
+fitted.highflex.test <- fitted(ll.fit.highflex.test)
+fitted.lowflex.test <- fitted(ll.fit.lowflex.test)
+
+graph2 <- ggplot() +
+  geom_point(data=test, mapping = aes(x = x, y = y)) + 
+  geom_line(data=test, mapping = aes(x = x, y = y_true.test)) +
+  geom_line(data=test, mapping = aes(x = x, y = fitted.highflex.test), color = "blue") +
+  geom_line(data=test, mapping = aes(x = x, y = fitted.lowflex.test), color = "red")
+graph2
+```
+
+```{r task2_step5_Var, echo=FALSE, results='hide'}
+variance.test <- cbind(var(y_true.test), var(fitted.highflex.test), var(fitted.lowflex.test))
+colnames(variance.test) <- c("true model","highflex","lowflex")
+
+variance.test
+```
+
+```{r task2_step5_Bias, echo=FALSE, results='hide'}
+bias.test <- cbind(mean(y_true.test-test$y), mean(fitted.highflex.test-test$y), mean(fitted.lowflex.test-test$y))
+colnames(bias.test) <- c("true model","highflex","lowflex")
+
+abs(bias.test)
+```
+The prediction most variable and with the least bias still is the model $ll.fit.highflex$, but now its bias increased with respect to the bias using the $training$ data.
+
+**\underline{Step 6 - Step 7 - Step 8}** We create a vector using the function $seq$.
+```{r task2_step6, echo=FALSE}
+vector <- seq(0.01, 0.5, by = 0.001)
+```
+
+We estimate a local linear model using the functions $lapply$ and $npreg$.
+```{r task2_step7, echo=FALSE}
+vector.fit <- lapply(X = vector, FUN = function(vector) {npreg(y ~ x, data = training, method = "ll", bws = vector)})
+```
+
+We create the function $train.mse$ which contains the $MSE$. The MSE was computed using the estimation/prediction of our local linear model and $y$. At the end we only organize our result in a list, using $unlist$ and $lapply$ (see R Script).
+```{r task2_step8, echo=FALSE}
+train.mse <- function(model.fit){
+  estimations <- predict(object = model.fit, newdata = training)
+  training %>% mutate(squared.error = (y - estimations)^2) %>% summarize(mse = mean(squared.error))
+}
+train.mse.output <- unlist(lapply(X = vector.fit, FUN = train.mse))
+```
+
+**\underline{Step 9:}** We reply the same done in the Step 8, but using the test data.
+```{r task2_step9, echo=FALSE}
+test.mse <- function(model.fit){
+  estimations <- predict(object = model.fit, newdata = test)
+  test %>% mutate(squared.error = (y - estimations)^2) %>% summarize(mse = mean(squared.error))
+}
+test.mse.output <- unlist(lapply(X = vector.fit, FUN = test.mse))
+```
+
+**\underline{Step 10:}** We arrange in a table the $bandwidth$ and both $MSE$, and finally we plot.
+```{r task2_step10, echo=FALSE, results='hide', fig.show='hide'}
+mse.table <- tbl_df(data.frame(bandwidth = vector, train.mse = train.mse.output, test.mse = test.mse.output))
+mse.table
+
+ggplot(mse.table) + 
+  geom_line(mapping = aes(x = bandwidth, y = train.mse), color = "blue") +
+  geom_line(mapping = aes(x = bandwidth, y = test.mse), color = "orange")
+```
+
+
+# Task 3B - Privacy regulation compliance in France
+
+**\underline{Step 1:}** We import the dataset using the url from the CNIL website.**
+```{r task3_step1, echo=FALSE, results="hide"}
+cil <- read.csv("https://www.data.gouv.fr/s/resources/correspondants-informatique-et-libertes-cil/20171115-183631/OpenCNIL_Organismes_avec_CIL_VD_20171115.csv"
+                , header=TRUE, sep = ";")
+```
+
+**\underline{Step 2:}** We have chosen the approach of splitting up the postal code so that we get a column in the data set with only the two first digists of the code.**
+```{r task3_step2, echo=FALSE, results="hide"}
+split <- t(sapply(cil$Code_Postal, function(x) substring(x, first=c(1,2), last=c(2,4))))
+cil1<- cbind(cil, split[,1])         
+colnames(cil1)<-c( "SIREN","Responsable","Adresse",
+                   "Code_Postal","Ville","NAF",
+                   "TypeCIL","Portee","Dep")
+```
+We then first identify the number of unique combinations of companies and first two digits of the postal code. This excludes the cases where the company has two representatives in the same department. Then in the list of unique CNIL per department list we identify the number of duplicates in the list of company names. This gives us the number of companies that has a representative in at least one department. We then use the function table() to show how many cases we have where the same company has nominated a CNIL for several departments.
+```{r 9, echo=FALSE, results="hide"}
+uniq.cil<-unique(cil1[c("SIREN","Dep")])
+head(uniq.cil)
+```
+The first six companies that have one representative per department is shown here, the full list is in the data frame uniq.cil. We then need to identify how many of these companies that have designated an CIL-responsible for each department. We do this by using the unique function.
+```{r 10, echo=FALSE, results="hide"}
+table.uniq<- table(unlist(duplicated(uniq.cil$SIREN)))
+table.uniq
+```
+This means that there are 17667 companies with a unique CIL-responsible per department, and 238 companies that have designated a CIL representative for two or more departments.
+
+**\underline{Step 3:}** First we import the data set using the function $fread()$. The import time is reduced by adding several arguments inside the $fread()$ command, we therefore set the following arguments inside the table when importing it.
+```{r task3_step3, echo=FALSE, results="hide"}
+siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE,fill=TRUE, sep=";", na.strings = "EMPTY", 
+                  stringsAsFactors = FALSE, nrows=10831177 )
+```
+
+```{r 11, echo=FALSE, results="hide"}
+system.time(siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE, fill=TRUE, sep=";", 
+                         na.strings = "EMPTY", stringsAsFactors = FALSE, nrows=10831177 ))
+```
+Then we transform CIL to a data table so that the format of the data is similiar. We then merge the list of CIL representatives and the SIREN data set by the variable "SIREN" since this variable is the same in the two data sets.
+```{r 12, echo=FALSE, results="hide"}
+cil2<-setDT(cil1)
+c<-as.character(cil2$SIREN)
+cil3<-cbind(cil2,c)
+
+colnames(cil3)<-c( "SIREN1","Responsable","Adresse",
+                   "Code_Postal","Ville","NAF",
+                   "TypeCIL","Portee","Dep","SIREN")
+total <- merge(siren, cil3, by="SIREN")
+```
+The new data table "total" now only contains the companies that have a CIL representative in the data set SIREN. If one wishes to include the companies that do not have a CIL representative this is easy to do, by only changing the argument all=TRUE.
+
+**\underline{Step 4:}** Since we now have the data set total that contains all the companies that have a CIL representative we use the data.table total to plot the size of the company by the size.
+```{r, fig.height = 3, fig.width = 5, echo=FALSE, echo=FALSE, results='hide', fig.show='hide'}
+hist1<-table(total$TEFET)
+plot(hist1)
+```
+
+
