@@ -7,8 +7,11 @@ classoption: a4paper
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-To start, we install all the packages needed for the whole challenge (see R script).
+**Link to the Github repo:** [https://github.com/mhitschfeld/Challenge_B_Final.git](https://github.com/mhitschfeld/Challenge_B_Final.git)
+
 ```{r packages, include=FALSE}
+# To start, we install all the packages needed for the whole challenge.
+
 packages <- c("dplyr", "mice", "data.table", "randomForest", "DMwR", "plyr", "Hmisc", "tidyverse", "caret", "gdata", "ggplot2", "np", "ff")
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))  
@@ -31,8 +34,8 @@ library(ff)
 # Task 1B - Predicting house prices in Ames, Iowa (continued)
 First, we load the dataset and call it train and test.
 ```{r 1, echo=FALSE, results="hide"}
-train1 <- read.csv("~/rprog/train.csv")
-test  <- read.csv("~/rprog/test.csv")
+train1 <- read.csv("~/rprog/train.csv") # change the path?
+test  <- read.csv("~/rprog/test.csv") # change the path?
 ```
 We analyse the data and get that there are some missing variables.
 ```{r 2, echo=FALSE, fig.height = 3, fig.width = 5, results="hide"}
@@ -245,13 +248,13 @@ ggplot(mse.table) +
 
 # Task 3B - Privacy regulation compliance in France
 
-**\underline{Step 1:}** We import the dataset using the url from the CNIL website.**
+**\underline{Step 1:}** We import the dataset using the url from the CNIL website.
 ```{r task3_step1, echo=FALSE, results="hide"}
 cil <- read.csv("https://www.data.gouv.fr/s/resources/correspondants-informatique-et-libertes-cil/20171115-183631/OpenCNIL_Organismes_avec_CIL_VD_20171115.csv"
                 , header=TRUE, sep = ";")
 ```
 
-**\underline{Step 2:}** We have chosen the approach of splitting up the postal code so that we get a column in the data set with only the two first digists of the code.**
+**\underline{Step 2:}** We have chosen the approach of splitting up the postal code so that we get a column in the data set with only the two first digists of the code.
 ```{r task3_step2, echo=FALSE, results="hide"}
 split <- t(sapply(cil$Code_Postal, function(x) substring(x, first=c(1,2), last=c(2,4))))
 cil1<- cbind(cil, split[,1])         
@@ -271,16 +274,18 @@ table.uniq
 ```
 This means that there are 17667 companies with a unique CIL-responsible per department, and 238 companies that have designated a CIL representative for two or more departments.
 
-**\underline{Step 3:}** First we import the data set using the function $fread()$. The import time is reduced by adding several arguments inside the $fread()$ command, we therefore set the following arguments inside the table when importing it.
-```{r task3_step3, echo=FALSE, results="hide"}
-siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE,fill=TRUE, sep=";", na.strings = "EMPTY", 
-                  stringsAsFactors = FALSE, nrows=10831177 )
+**\underline{Step 3:}** First we import the data set using the function $fread()$. The import time is reduced by adding several arguments inside the $fread()$ command, we therefore set the following arguments inside the table when importing it **(about 10 minutes, in R script is the code that details the time needed)**.
+```{r 11, echo=FALSE, results="hide", eval=FALSE}
+# Here we detail the time needed to import the data. We put "eval=FALSE" to not waste time during the compilation of the PDF, since this result it is not necessary for the following questions.
+system.time(siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE, fill=TRUE, sep=";", 
+                         na.strings = "EMPTY", stringsAsFactors = FALSE, nrows=10831177 )) # change the path?
 ```
 
-```{r 11, echo=FALSE, results="hide"}
-system.time(siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE, fill=TRUE, sep=";", 
-                         na.strings = "EMPTY", stringsAsFactors = FALSE, nrows=10831177 ))
+```{r task3_step3, echo=FALSE, results="hide"}
+siren<-fread(file = "~/rprog/SIREN.csv", header = TRUE,fill=TRUE, sep=";", na.strings = "EMPTY", 
+                  stringsAsFactors = FALSE, nrows=10831177 ) # change the path?
 ```
+
 Then we transform CIL to a data table so that the format of the data is similiar. We then merge the list of CIL representatives and the SIREN data set by the variable "SIREN" since this variable is the same in the two data sets.
 ```{r 12, echo=FALSE, results="hide"}
 cil2<-setDT(cil1)
